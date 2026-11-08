@@ -40,6 +40,9 @@ const id = location.pathname.split("/").pop();
 const storageKey = "relay-screen-" + id;
 if (suppliedKey) sessionStorage.setItem(storageKey + "-managed", "1");
 const managed = sessionStorage.getItem(storageKey + "-managed") === "1";
+// Keep the sleep screen through a reload or socket reconnect in this kiosk tab.
+const sleepKey = storageKey + "-sleep";
+document.documentElement.classList.toggle("sleeping", sessionStorage.getItem(sleepKey) === "1");
 const login = document.querySelector("#login");
 const key = document.querySelector("#key");
 const statusLine = document.querySelector("#status");
@@ -58,6 +61,11 @@ function connect(token) {
         if (data.status === "registered") {
             sessionStorage.setItem(storageKey, token);
             statusLine.textContent = "Connected";
+        } else if (typeof data.enabled === "boolean") {
+            document.documentElement.classList.toggle("sleeping", !data.enabled);
+            if (data.enabled) sessionStorage.removeItem(sleepKey);
+            else sessionStorage.setItem(sleepKey, "1");
+            socket.send(JSON.stringify({applied: data.command_id}));
         } else {
             display(data.screen);
         }
@@ -66,6 +74,8 @@ function connect(token) {
         if ([4403, 4409, 1008].includes(event.code) && !managed) {
             sessionStorage.removeItem(storageKey);
             statusLine.textContent = event.code === 4409 ? "Screen ID already connected." : "Registration rejected.";
+            document.documentElement.classList.remove("sleeping");
+            sessionStorage.removeItem(sleepKey);
             login.hidden = false;
         } else {
             statusLine.textContent = event.code === 4403 ? "Check the configured screen key. Retrying…" : "Disconnected. Reconnecting…";

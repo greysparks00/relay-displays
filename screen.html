@@ -12,6 +12,8 @@
     <style>
         :root { color-scheme: light dark; font-family: "Segoe UI", system-ui, sans-serif; }
         body { margin: 0 auto; max-width: 100rem; padding: clamp(1rem, 4vw, 4rem); }
+        html.sleeping { background: black; cursor: none; overflow: hidden; }
+        html.sleeping body { visibility: hidden; }
         header { display: flex; align-items: baseline; gap: 1rem; }
         h1 { margin: 0; font-size: 1.2rem; }
         #status { opacity: .75; }

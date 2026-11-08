@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+from uuid import uuid4
 from pathlib import Path
 from secrets import compare_digest
 
@@ -28,6 +29,7 @@ def create_app():
         raise ValueError("Set distinct RELAY_SCREEN_KEY and RELAY_DISPLAY_TOKEN in relay-displays/.env.")
 
     live = {}
+    pending = {}  # Browser acknowledgements, indexed by socket and command ID.
 
     # Redirect the root path to the first screen.
     async def home(request):
@@ -64,10 +66,22 @@ def create_app():
                 return
 
             live[screen] = ws
+            pending[ws] = {}
             await ws.send_json({"status": "registered", "id": int(screen)})
-            # The first message authenticates; screen connections are then receive-only.
-            await ws.receive_text()
-            await ws.close(code=1008)
+            while True:
+                frame = await ws.receive()
+                if frame["type"] == "websocket.disconnect":
+                    break
+                try:
+                    ack = json.loads(frame.get("text") or "")
+                    if not isinstance(ack, dict) or not isinstance(ack.get("applied"), str):
+                        raise ValueError
+                except (ValueError, RecursionError):
+                    await ws.close(code=1008)
+                    break
+                waiter = pending[ws].get(ack["applied"])
+                if waiter is not None and not waiter.done():
+                    waiter.set_result(True)
 
         except TimeoutError:
             await ws.close(code=1008)
@@ -76,6 +90,9 @@ def create_app():
             pass
 
         finally:
+            for waiter in pending.pop(ws, {}).values():
+                if not waiter.done():
+                    waiter.set_result(False)
             if live.get(screen) is ws:
                 del live[screen]
 
@@ -95,27 +112,31 @@ def create_app():
         try:
             message = json.loads(body)
 
-            if (not isinstance(message, dict) or set(message) != {"id", "screen"}
-                    or type(message["id"]) is not int or not 1 <= message["id"] <= 2147483647):
+            if (not isinstance(message, dict)
+                    or type(message.get("id")) is not int or not 1 <= message["id"] <= 2147483647):
                 raise ValueError
-            layout = message["screen"]
-            if not isinstance(layout, dict):
-                raise ValueError
-            if layout.get("type") == "text":
-                fields = ("content",)
-            elif layout.get("type") == "comparison":
-                fields = ("option1", "option2")
-            else:
-                raise ValueError
-            if set(layout) != {"type", *fields}:
-                raise ValueError
-            for field in fields:
-                value = layout[field]
-                if not isinstance(value, str) or len(value) > 8192 or (field != "content" and not value):
+            control = set(message) == {"id", "enabled"} and type(message["enabled"]) is bool
+            if not control:
+                if set(message) != {"id", "screen"}:
                     raise ValueError
-                value.encode("utf-8")
+                layout = message["screen"]
+                if not isinstance(layout, dict):
+                    raise ValueError
+                if layout.get("type") == "text":
+                    fields = ("content",)
+                elif layout.get("type") == "comparison":
+                    fields = ("option1", "option2")
+                else:
+                    raise ValueError
+                if set(layout) != {"type", *fields}:
+                    raise ValueError
+                for field in fields:
+                    value = layout[field]
+                    if not isinstance(value, str) or len(value) > 8192 or (field != "content" and not value):
+                        raise ValueError
+                    value.encode("utf-8")
         except (ValueError, RecursionError):
-            return JSONResponse({"error": "Expected a screen ID and a text or comparison payload."}, status_code=400)
+            return JSONResponse({"error": "Expected an ID with a screen payload or an enabled boolean."}, status_code=400)
 
         screen = str(message["id"])
 
@@ -124,6 +145,22 @@ def create_app():
         # Check if the screen is currently connected.
         if ws is None:
             return JSONResponse({"error": "screen offline"}, status_code=409)
+
+        if control:
+            command = uuid4().hex
+            waiter = asyncio.get_running_loop().create_future()
+            waiters = pending[ws]
+            waiters[command] = waiter
+            try:
+                async with asyncio.timeout(3):
+                    await ws.send_json({**message, "command_id": command})
+                    if await waiter:
+                        return JSONResponse({"id": message["id"], "status": "applied"})
+            except (TimeoutError, WebSocketDisconnect, OSError, RuntimeError):
+                pass
+            finally:
+                waiters.pop(command, None)
+            return JSONResponse({"error": "kiosk did not confirm the command"}, status_code=504)
 
         # Send the message to the connected screen.
         try:
