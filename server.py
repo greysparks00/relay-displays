@@ -41,6 +41,9 @@ def create_app():
             return JSONResponse({"error": "unknown screen"}, status_code=404)
         return FileResponse(Path(__file__).with_name("screen.html"), headers={"Cache-Control": "no-store"})
 
+    async def core_stylesheet(request):
+        return FileResponse(Path(__file__).with_name("core.css"), media_type="text/css")
+
     async def connection_script(request):
         return FileResponse(Path(__file__).with_name("server.js"), media_type="text/javascript")
 
@@ -58,6 +61,7 @@ def create_app():
                 token = await ws.receive_text()
 
             if not matches(token, screen_key):
+                print(f"[DISPLAY] Screen {screen}: invalid authentication")
                 await ws.close(code=4403)
                 return
 
@@ -66,8 +70,12 @@ def create_app():
                 return
 
             live[screen] = ws
+            print(f"[DISPLAY] Screen {screen} connected")
+
             pending[ws] = {}
+
             await ws.send_json({"status": "registered", "id": int(screen)})
+
             while True:
                 frame = await ws.receive()
                 if frame["type"] == "websocket.disconnect":
@@ -96,6 +104,8 @@ def create_app():
             if live.get(screen) is ws:
                 del live[screen]
 
+            print(f"[DISPLAY] Screen {screen} disconnected")
+
     # Route a message to a connected screen.
     async def send(request):
         if not matches(request.headers.get("authorization"), "Bearer " + sender):
@@ -115,31 +125,45 @@ def create_app():
             if (not isinstance(message, dict)
                     or type(message.get("id")) is not int or not 1 <= message["id"] <= 2147483647):
                 raise ValueError
+            
             control = set(message) == {"id", "enabled"} and type(message["enabled"]) is bool
+            
             if not control:
                 if set(message) != {"id", "screen"}:
                     raise ValueError
+                
                 layout = message["screen"]
+
                 if not isinstance(layout, dict):
                     raise ValueError
+                
                 if layout.get("type") == "text":
                     fields = ("content",)
+
                 elif layout.get("type") == "comparison":
                     fields = ("option1", "option2")
+
                 else:
                     raise ValueError
+                
                 if set(layout) != {"type", *fields}:
                     raise ValueError
+                
                 for field in fields:
                     value = layout[field]
+
                     if not isinstance(value, str) or len(value) > 8192 or (field != "content" and not value):
                         raise ValueError
+                    
                     value.encode("utf-8")
+
         except (ValueError, RecursionError):
             return JSONResponse({"error": "Expected an ID with a screen payload or an enabled boolean."}, status_code=400)
 
         screen = str(message["id"])
 
+        print(f"[DISPLAY] Requested screen: {screen}")
+        print(f"[DISPLAY] Connected screens: {list(live.keys())}")
         ws = live.get(screen)
 
         # Check if the screen is currently connected.
@@ -181,6 +205,7 @@ def create_app():
     return Starlette(routes=[
         Route("/", home),
         Route("/screen/{id:int}", page),
+        Route("/core.css", core_stylesheet),
         Route("/server.js", connection_script),
         Mount("/displays", app=StaticFiles(directory=Path(__file__).with_name("displays"))),
         WebSocketRoute("/v1/screens/{id:int}/connect", register),

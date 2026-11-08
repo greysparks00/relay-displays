@@ -1,34 +1,45 @@
 <!doctype html>
-<!--
-    On registration, server.js receives {"status":"registered","id":1}.
-    A display update looks like {"id":1,"screen":{"type":"text","content":"Hello"}}.
-    server.js selects the layout by screen.type and passes the inner screen object to its renderer.
--->
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Relay screen</title>
-    <style>
-        :root { color-scheme: light dark; font-family: "Segoe UI", system-ui, sans-serif; }
-        body { margin: 0 auto; max-width: 100rem; padding: clamp(1rem, 4vw, 4rem); }
-        html.sleeping { background: black; cursor: none; overflow: hidden; }
-        html.sleeping body { visibility: hidden; }
-        header { display: flex; align-items: baseline; gap: 1rem; }
-        h1 { margin: 0; font-size: 1.2rem; }
-        #status { opacity: .75; }
-    </style>
+
+    <title>Relay Display</title>
+
+    <link rel="stylesheet" href="/core.css">
     <script type="module" src="/server.js"></script>
 </head>
 <body>
-    <header>
-        <h1 id="heading"></h1>
-        <p id="status" role="status"></p>
+    <header class="app-header">
+        <div class="app-brand">
+            <div class="brand-icon">R_</div>
+
+            <div class="brand-name">
+                <strong>RELAY</strong>
+                <span>/ INTERFACE</span>
+            </div>
+        </div>
+
+        <div class="header-info">
+            <h1 id="screen-status"></h1>
+
+            <span class="status-dot"></span>
+            <p id="status" role="status">DISCONNECTED</p>
+        </div>
     </header>
+
     <form id="login">
-        <label>Shared screen key <input type="password" id="key" required autocomplete="off"></label>
-        <button>Connect</button>
+        <label for="key">SCREEN AUTHENTICATION</label>
+        <input
+            type="password"
+            id="key"
+            placeholder="Enter screen key"
+            required
+            autocomplete="off"
+        >
+        <button type="submit">CONNECT</button>
     </form>
+
     <main id="payload" aria-live="polite"></main>
 </body>
 </html>

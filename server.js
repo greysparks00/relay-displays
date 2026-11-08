@@ -54,7 +54,7 @@ const login = document.querySelector("#login");
 const key = document.querySelector("#key");
 const statusLine = document.querySelector("#status");
 
-document.querySelector("#heading").textContent = document.title = "Screen " + id;
+document.querySelector("#screen-status").textContent = document.title = "Screen " + id;
 
 // The page owns the connection. Rendering a new layout only replaces the contents of <main>.
 function connect(token) {
@@ -94,11 +94,13 @@ function connect(token) {
         }
     };
 }
+
 login.onsubmit = event => {
     event.preventDefault();
     const token = key.value;
     key.value = "";
     connect(token);
 };
+
 const saved = suppliedKey ?? sessionStorage.getItem(storageKey);
 if (saved) connect(saved);
