@@ -1,4 +1,4 @@
-"""One live WebSocket per screen, one POST to route content. Run one worker."""
+# One live WebSocket per screen, one POST to route content. Run one worker.
 
 import asyncio
 import json
