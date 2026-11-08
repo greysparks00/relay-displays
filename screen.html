@@ -1,4 +1,9 @@
 <!doctype html>
+<!--
+    On registration, server.js receives {"status":"registered","id":1}.
+    A display update looks like {"id":1,"screen":{"type":"text","content":"Hello"}}.
+    server.js selects the layout by screen.type and passes the inner screen object to its renderer.
+-->
 <html lang="en">
 <head>
     <meta charset="utf-8">
