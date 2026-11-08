@@ -1,67 +1,27 @@
 <!doctype html>
 <html lang="en">
+<head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Relay screen</title>
     <style>
-        :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-        body { margin: 2rem; }
-        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.2rem; }
+        :root { color-scheme: light dark; font-family: "Segoe UI", system-ui, sans-serif; }
+        body { margin: 0 auto; max-width: 100rem; padding: clamp(1rem, 4vw, 4rem); }
+        header { display: flex; align-items: baseline; gap: 1rem; }
+        h1 { margin: 0; font-size: 1.2rem; }
+        #status { opacity: .75; }
     </style>
-    <h1 id="heading"></h1>
-    <p id="status" role="status"></p>
+    <script type="module" src="/server.js"></script>
+</head>
+<body>
+    <header>
+        <h1 id="heading"></h1>
+        <p id="status" role="status"></p>
+    </header>
     <form id="login">
-    <label>Shared screen key <input type="password" id="key" required autocomplete="off"></label>
-    <button>Connect</button>
+        <label>Shared screen key <input type="password" id="key" required autocomplete="off"></label>
+        <button>Connect</button>
     </form>
-    <pre id="payload"></pre>
-    <script>
-    const suppliedKey = new URLSearchParams(location.hash.slice(1)).get("key");
-    if (suppliedKey !== null) history.replaceState(null, "", location.pathname + location.search);
-    const id = location.pathname.split("/").pop();
-    const storageKey = "relay-screen-" + id;
-    if (suppliedKey) sessionStorage.setItem(storageKey + "-managed", "1");
-    const managed = sessionStorage.getItem(storageKey + "-managed") === "1";
-    const login = document.querySelector("#login");
-    const key = document.querySelector("#key");
-    const statusLine = document.querySelector("#status");
-
-    document.querySelector("#heading").textContent = document.title = "Screen " + id;
-
-    function connect(token) {
-        login.hidden = true;
-        statusLine.textContent = "Connecting…";
-        const url = new URL("/v1/screens/" + id + "/connect", location.href);
-        url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-        const socket = new WebSocket(url);
-        socket.onopen = () => socket.send(token);
-        socket.onmessage = event => {
-        const data = JSON.parse(event.data);
-        if (data.status === "registered") {
-            sessionStorage.setItem(storageKey, token);
-            statusLine.textContent = "Connected";
-        } else {
-            document.querySelector("#payload").textContent = JSON.stringify(data, null, 2);
-        }
-        };
-        socket.onclose = event => {
-        if ([4403, 4409, 1008].includes(event.code) && !managed) {
-            sessionStorage.removeItem(storageKey);
-            statusLine.textContent = event.code === 4409 ? "Screen ID already connected." : "Registration rejected.";
-            login.hidden = false;
-        } else {
-            statusLine.textContent = event.code === 4403 ? "Check the configured screen key. Retrying…" : "Disconnected. Reconnecting…";
-            setTimeout(() => connect(token), 2000);
-        }
-        };
-    }
-    login.onsubmit = event => {
-        event.preventDefault();
-        const token = key.value;
-        key.value = "";
-        connect(token);
-    };
-    const saved = suppliedKey ?? sessionStorage.getItem(storageKey);
-    if (saved) connect(saved);
-    </script>
+    <main id="payload" aria-live="polite"></main>
+</body>
 </html>

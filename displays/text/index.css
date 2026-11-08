@@ -1,0 +1,8 @@
+.text-display {
+    max-width: 66ch;
+    margin: 1.5em auto;
+    font-size: clamp(1.25rem, 2.6vw, 3rem);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

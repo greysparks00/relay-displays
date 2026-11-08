@@ -10,7 +10,8 @@ from dotenv import load_dotenv
 import uvicorn
 from starlette.applications import Starlette
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse
-from starlette.routing import Route, WebSocketRoute
+from starlette.routing import Mount, Route, WebSocketRoute
+from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocketDisconnect
 
 # Compare a provided value against a secret using a constant-time comparison.
@@ -37,6 +38,9 @@ def create_app():
         if not 1 <= request.path_params["id"] <= 2147483647:
             return JSONResponse({"error": "unknown screen"}, status_code=404)
         return FileResponse(Path(__file__).with_name("screen.html"), headers={"Cache-Control": "no-store"})
+
+    async def connection_script(request):
+        return FileResponse(Path(__file__).with_name("server.js"), media_type="text/javascript")
 
     # Register a screen connection after validating its token.
     async def register(ws):
@@ -140,6 +144,8 @@ def create_app():
     return Starlette(routes=[
         Route("/", home),
         Route("/screen/{id:int}", page),
+        Route("/server.js", connection_script),
+        Mount("/displays", app=StaticFiles(directory=Path(__file__).with_name("displays"))),
         WebSocketRoute("/v1/screens/{id:int}/connect", register),
         Route("/v1/screens/send", send, methods=["POST"]),
     ])

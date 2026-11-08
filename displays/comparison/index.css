@@ -1,0 +1,19 @@
+.comparison-display {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1.5rem, 4vw, 4rem);
+    margin-top: 2rem;
+}
+.comparison-display p {
+    margin: 0;
+    padding-top: 1rem;
+    border-top: .2rem solid #638b9d;
+    font-size: clamp(1.25rem, 2vw, 2.5rem);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.comparison-display p + p { border-color: #b78259; }
+@media (max-width: 42rem) {
+    .comparison-display { grid-template-columns: 1fr; }
+}
